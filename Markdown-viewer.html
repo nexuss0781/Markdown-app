@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexuss Markdown Viewer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark.min.css">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --dark: #1e293b;
+            --darker: #0f172a;
+            --light: #f8fafc;
+            --gray: #94a3b8;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius: 12px;
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: var(--light);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.1) 0%, transparent 25%), 
+                        radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 25%);
+            z-index: -1;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            position: relative;
+            padding-top: 1rem;
+        }
+        
+        header h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #c084fc, #8b5cf6, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.03em;
+        }
+        
+        header p {
+            color: var(--gray);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        
+        .app-container {
+            display: flex;
+            gap: 2rem;
+            height: calc(100vh - 150px);
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            border-radius: var(--radius);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: rgba(30, 41, 59, 0.8);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+        
+        .sidebar-header {
+            padding: 1.25rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .sidebar-header h2 {
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .folder-path {
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-top: 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .file-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+        
+        .file-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .file-list::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        
+        .file-list::-webkit-scrollbar-thumb {
+            background: rgba(139, 92, 246, 0.5);
+            border-radius: 10px;
+        }
+        
+        .file-item {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .file-item:hover {
+            background: rgba(99, 102, 241, 0.15);
+        }
+        
+        .file-item.active {
+            background: rgba(99, 102, 241, 0.25);
+            border-left: 3px solid var(--primary);
+        }
+        
+        .file-item::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--primary);
+            opacity: 0;
+            transition: var(--transition);
+        }
+        
+        .file-item:hover::after {
+            opacity: 1;
+        }
+        
+        .file-item i {
+            font-size: 1.1rem;
+            color: var(--primary);
+            width: 24px;
+            text-align: center;
+        }
+        
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        
+        .file-meta {
+            font-size: 0.75rem;
+            color: var(--gray);
+            white-space: nowrap;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .content-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .current-file {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 0.75rem;
+        }
+        
+        .btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            color: var(--light);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            font-size: 1rem;
+        }
+        
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+        
+        .btn.primary {
+            background: var(--primary);
+        }
+        
+        .btn.primary:hover {
+            background: var(--primary-dark);
+        }
+        
+        .markdown-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            background: rgba(30, 41, 59, 0.3);
+            position: relative;
+        }
+        
+        .markdown-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .markdown-content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        
+        .markdown-content::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 10px;
+        }
+        
+        .placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray);
+        }
+        
+        .placeholder i {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            color: rgba(139, 92, 246, 0.4);
+        }
+        
+        .placeholder h3 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(90deg, #c084fc, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .placeholder p {
+            max-width: 500px;
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+        }
+        
+        .open-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+        
+        .open-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        
+        .markdown-content h1 {
+            font-size: 2.2rem;
+            margin-bottom: 1.5rem;
+            color: white;
+            position: relative;
+            padding-bottom: 0.5rem;
+        }
+        
+        .markdown-content h1::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 2px;
+        }
+        
+        .markdown-content h2 {
+            font-size: 1.8rem;
+            margin: 1.8rem 0 1rem;
+            color: white;
+        }
+        
+        .markdown-content h3 {
+            font-size: 1.4rem;
+            margin: 1.5rem 0 0.8rem;
+            color: white;
+        }
+        
+        .markdown-content p {
+            line-height: 1.7;
+            margin-bottom: 1.2rem;
+            color: #cbd5e1;
+        }
+        
+        .markdown-content a {
+            color: var(--primary);
+            text-decoration: none;
+            border-bottom: 1px solid var(--primary);
+            transition: var(--transition);
+        }
+        
+        .markdown-content a:hover {
+            color: var(--secondary);
+            border-bottom-color: var(--secondary);
+        }
+        
+        .markdown-content ul, 
+        .markdown-content ol {
+            margin: 1.2rem 0 1.2rem 1.5rem;
+            padding-left: 1rem;
+        }
+        
+        .markdown-content li {
+            margin-bottom: 0.6rem;
+            line-height: 1.6;
+            color: #cbd5e1;
+        }
+        
+        .markdown-content pre {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .markdown-content code {
+            font-family: 'Source Code Pro', monospace;
+            color: #f0f0f0;
+        }
+        
+        .markdown-content blockquote {
+            border-left: 3px solid var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .markdown-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .markdown-content th {
+            background: rgba(99, 102, 241, 0.2);
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .markdown-content td {
+            padding: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .markdown-content tr:nth-child(even) {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        .no-files {
+            color: var(--gray);
+            font-style: italic;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            color: var(--gray);
+            font-size: 0.9rem;
+            padding: 1rem;
+        }
+        
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 900px) {
+            .app-container {
+                flex-direction: column;
+                height: auto;
+                min-height: 70vh;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: 300px;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            header h1 {
+                font-size: 2.2rem;
+            }
+            
+            .app-container {
+                height: auto;
+                min-height: 60vh;
+            }
+            
+            .sidebar {
+                max-height: 250px;
+            }
+            
+            .markdown-content {
+                padding: 1.25rem;
+            }
+        }
+        
+        /* Animation for file selection */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .file-item.active {
+            animation: fadeIn 0.3s ease forwards;
+        }
+        
+        /* Glow effect for buttons */
+        .btn {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 70%);
+            transform: scale(0);
+            transition: transform 0.3s ease;
+            z-index: 0;
+        }
+        
+        .btn:hover::after {
+            transform: scale(1);
+        }
+        
+        .btn i {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-book-open"></i> Nexuss Markdown Viewer</h1>
+            <p>Beautifully view and navigate through all markdown files in any folder on your device</p>
+        </header>
+        
+        <div class="app-container">
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2><i class="fas fa-folder-tree"></i> Files</h2>
+                    <button id="select-folder" class="btn primary" title="Select Folder">
+                        <i class="fas fa-folder-open"></i>
+                    </button>
+                </div>
+                <div class="folder-path" id="folder-path">No folder selected</div>
+                <div class="file-list" id="file-list">
+                    <div class="placeholder">
+                        <i class="fas fa-file-alt"></i>
+                        <h3>No Files Selected</h3>
+                        <p>Click the folder icon above to select a folder containing markdown files</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="main-content">
+                <div class="content-header">
+                    <div class="current-file">
+                        <i class="fas fa-file-alt"></i>
+                        <span id="current-file">Select a file to view</span>
+                    </div>
+                    <div class="controls">
+                        <button class="btn" id="theme-toggle" title="Toggle Theme">
+                            <i class="fas fa-moon"></i>
+                        </button>
+                        <button class="btn" id="fullscreen" title="Fullscreen">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="markdown-content" id="markdown-content">
+                    <div class="placeholder">
+                        <i class="fas fa-book-open"></i>
+                        <h3>Welcome to Nexuss Markdown Viewer</h3>
+                        <p>Select a folder to see your markdown files in the sidebar. Click any file to view its beautifully rendered content here.</p>
+                        <button id="select-folder-btn" class="open-btn">
+                            <i class="fas fa-folder-open"></i> Select Folder
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Created with ❤️ by Nexuss using HTML, CSS & JavaScript | Markdown parsed with <a href="https://marked.js.org/" target="_blank">Marked.js</a> & syntax highlighted with <a href="https://highlightjs.org/" target="_blank">Highlight.js</a></p>
+        </footer>
+    </div>
+    
+    <input type="file" id="folder-input" webkitdirectory directory multiple style="display: none;">
+    
+    <script>
+        // DOM Elements
+        const folderInput = document.getElementById('folder-input');
+        const selectFolderBtn = document.getElementById('select-folder');
+        const selectFolderBtn2 = document.getElementById('select-folder-btn');
+        const fileList = document.getElementById('file-list');
+        const markdownContent = document.getElementById('markdown-content');
+        const currentFile = document.getElementById('current-file');
+        const folderPath = document.getElementById('folder-path');
+        const themeToggle = document.getElementById('theme-toggle');
+        const fullscreenBtn = document.getElementById('fullscreen');
+        
+        // Sample markdown content for demonstration
+        const sampleMarkdown = `# Welcome to Beautiful Markdown Viewer
+        
+This application allows you to browse and view markdown files from any folder on your device.
+        
+## Features
+        
+- **Beautiful Rendering**: Clean, readable presentation of your markdown content
+- **Syntax Highlighting**: Code blocks automatically highlighted for better readability
+- **File Navigation**: Easily browse all markdown files in your selected folder
+- **Responsive Design**: Works great on desktop, tablet, and mobile devices
+- **Dark Theme**: Elegant dark mode that's easy on the eyes
+        
+## How to Use
+        
+1. Click the folder icon in the sidebar or the "Select Folder" button
+2. Choose any folder containing markdown files (\`.md\` or \`.markdown\`)
+3. Click on any file in the sidebar to view its content
+4. Navigate between files using the sidebar
+        
+\`\`\`javascript
+// Sample code block with syntax highlighting
+function beautifulMarkdown() {
+    const viewer = new MarkdownViewer();
+    viewer.render();
+    console.log("Enjoy your beautifully rendered markdown!");
+}
+\`\`\`
+        
+## Tables
+        
+| Feature | Supported | Notes |
+|---------|-----------|-------|
+| Syntax Highlighting | ✅ | 100+ languages |
+| Tables | ✅ | With responsive layout |
+| Task Lists | ✅ | Interactive checkboxes |
+| Math Formulas | ❌ | Coming soon! |
+        
+> **Tip:** This viewer uses the [Marked.js](https://marked.js.org) library for parsing markdown and [Highlight.js](https://highlightjs.org) for syntax highlighting.
+        
+### Getting Started
+        
+[Learn more about markdown syntax](https://www.markdownguide.org) to create beautiful documents with ease. This viewer will automatically handle all formatting for you!`;
+        
+        // State variables
+        let files = [];
+        let currentFilePath = '';
+        let isDarkTheme = true;
+        
+        // Initialize the app
+        function init() {
+            // Set up event listeners
+            selectFolderBtn.addEventListener('click', triggerFolderSelect);
+            selectFolderBtn2.addEventListener('click', triggerFolderSelect);
+            folderInput.addEventListener('change', handleFolderSelect);
+            themeToggle.addEventListener('click', toggleTheme);
+            fullscreenBtn.addEventListener('click', toggleFullscreen);
+            
+            // Render initial content
+            renderMarkdown(sampleMarkdown);
+            
+            // Load saved theme preference
+            const savedTheme = localStorage.getItem('markdown-viewer-theme');
+            if (savedTheme === 'light') {
+                isDarkTheme = false;
+                document.body.classList.remove('dark-theme');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            }
+        }
+        
+        // Trigger folder selection dialog
+        function triggerFolderSelect() {
+            folderInput.click();
+        }
+        
+        // Handle folder selection
+        function handleFolderSelect(e) {
+            const selectedFiles = Array.from(e.target.files);
+            const markdownFiles = selectedFiles.filter(file => 
+                file.name.endsWith('.md') || 
+                file.name.endsWith('.markdown')
+            );
+            
+            if (markdownFiles.length === 0) {
+                alert('No markdown files found in the selected folder!');
+                return;
+            }
+            
+            files = markdownFiles;
+            currentFilePath = markdownFiles[0].webkitRelativePath;
+            
+            // Display folder path
+            const pathParts = currentFilePath.split('/');
+            folderPath.textContent = `/${pathParts.slice(0, -1).join('/')}`;
+            
+            // Render file list
+            renderFileList();
+            
+            // Render first file
+            renderFileContent(markdownFiles[0]);
+        }
+        
+        // Render file list in sidebar
+        function renderFileList() {
+            if (files.length === 0) {
+                fileList.innerHTML = `
+                    <div class="placeholder">
+                        <i class="fas fa-file-alt"></i>
+                        <h3>No Files Selected</h3>
+                        <p>Click the folder icon to select a folder with markdown files</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            fileList.innerHTML = '';
+            
+            files.forEach(file => {
+                const filePath = file.webkitRelativePath;
+                const fileName = file.name;
+                const relativePath = filePath.split('/').slice(0, -1).join('/');
+                
+                const fileItem = document.createElement('div');
+                fileItem.className = `file-item ${currentFilePath === filePath ? 'active' : ''}`;
+                fileItem.innerHTML = `
+                    <i class="fas fa-file-alt"></i>
+                    <div class="file-name">${fileName}</div>
+                    <div class="file-meta">${relativePath}</div>
+                `;
+                
+                fileItem.addEventListener('click', () => {
+                    currentFilePath = filePath;
+                    renderFileList();
+                    renderFileContent(file);
+                });
+                
+                fileList.appendChild(fileItem);
+            });
+        }
+        
+        // Render markdown content
+        function renderFileContent(file) {
+            currentFile.textContent = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                renderMarkdown(content);
+            };
+            reader.readAsText(file);
+        }
+        
+        // Render markdown to HTML
+        function renderMarkdown(content) {
+            // Configure marked with highlight.js
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                    return hljs.highlight(code, { language }).value;
+                },
+                langPrefix: 'hljs language-'
+            });
+            
+            markdownContent.innerHTML = marked.parse(content);
+            
+            // Add animation to content
+            markdownContent.style.opacity = '0';
+            setTimeout(() => {
+                markdownContent.style.opacity = '1';
+                markdownContent.style.transition = 'opacity 0.3s ease';
+            }, 50);
+        }
+        
+        // Toggle between dark and light theme
+        function toggleTheme() {
+            isDarkTheme = !isDarkTheme;
+            
+            if (isDarkTheme) {
+                document.body.classList.add('dark-theme');
+                themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+                localStorage.setItem('markdown-viewer-theme', 'dark');
+            } else {
+                document.body.classList.remove('dark-theme');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+                localStorage.setItem('markdown-viewer-theme', 'light');
+            }
+        }
+        
+        // Toggle fullscreen mode
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                    fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+                }
+            }
+        }
+        
+        // Handle fullscreen change events
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+            }
+        });
+        
+        // Initialize the app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', init);
+        
+        // Handle drag and drop functionality
+        document.body.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            document.body.style.backgroundColor = 'rgba(99, 102, 241, 0.1)';
+        });
+        
+        document.body.addEventListener('dragleave', () => {
+            document.body.style.backgroundColor = '';
+        });
+        
+        document.body.addEventListener('drop', (e) => {
+            e.preventDefault();
+            document.body.style.backgroundColor = '';
+            
+            if (e.dataTransfer.items) {
+                const items = Array.from(e.dataTransfer.items);
+                const entries = items.filter(item => item.kind === 'file')
+                                     .map(item => item.webkitGetAsEntry());
+                
+                const files = [];
+                let processed = 0;
+                
+                const processEntry = (entry) => {
+                    if (entry.isFile) {
+                        entry.file(file => {
+                            if (file.name.endsWith('.md') || file.name.endsWith('.markdown')) {
+                                files.push(file);
+                            }
+                            processed++;
+                            if (processed === entries.length) {
+                                handleDroppedFiles(files);
+                            }
+                        });
+                    } else if (entry.isDirectory) {
+                        const reader = entry.createReader();
+                        reader.readEntries(entries => {
+                            entries.forEach(processEntry);
+                            processed++;
+                            if (processed === entries.length) {
+                                handleDroppedFiles(files);
+                            }
+                        });
+                    }
+                };
+                
+                entries.forEach(processEntry);
+            }
+        });
+        
+        function handleDroppedFiles(files) {
+            if (files.length === 0) {
+                alert('No markdown files found in the dropped folder!');
+                return;
+            }
+            
+            // Create a fake FileList object
+            const dt = new DataTransfer();
+            files.forEach(file => dt.items.add(file));
+            
+            folderInput.files = dt.files;
+            handleFolderSelect({ target: folderInput });
+        }
+    </script>
+</body>
+</html>
